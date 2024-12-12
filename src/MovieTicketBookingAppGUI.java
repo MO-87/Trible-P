@@ -130,7 +130,6 @@ public class MovieBookingAppGUI extends Application {
                             "-fx-font-weight: bold;" +
                             "-fx-min-width: 110px;"
             );
-            Show_Alert("Success", "Seat booked successfully!");
         });
     }
 
@@ -140,8 +139,9 @@ public class MovieBookingAppGUI extends Application {
 
             if (success) {
                 Update_All_Instances(row, col);
+                Show_Alert("Success", "Seat booked successfully!");
             } else {
-                Platform.runLater(() -> Show_Alert("Error", "Seat already booked."));
+                Show_Alert("Error", "Seat already booked.");
             }
         });
 
@@ -156,6 +156,7 @@ public class MovieBookingAppGUI extends Application {
                     Change_Seat_Color(seatButton);
                 }
             }
+
         });
     }
 
@@ -173,6 +174,11 @@ public class MovieBookingAppGUI extends Application {
                     Button seatButton = seatButtonMap.get(row + "," + col);
                     if (seatButton != null) {
                         Update_All_Instances(row, col);
+                        if (success){
+                            Show_Alert("Success", "Seat booked successfully!");
+                        }else {
+                            Show_Alert("Error", "Seat already booked.");
+                        }
                         String result = success
                                 ? "User " + (index+1) + " successfully booked Seat (" + (row+1) + ", " + (col+1) + ")"
                                 : "User " + (index+1) + " failed to book Seat (" + (row+1) + ", " + (col+1) + ")";
