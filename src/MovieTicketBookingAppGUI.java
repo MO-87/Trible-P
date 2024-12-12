@@ -1,145 +1,187 @@
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-public class MovieTicketBookingAppGUI extends Application {
-    private BookingSys BS;
-    private final int rows = 5;
-    private final int cols = 5;
-    private final Map<String, Button> seatButtonMap = new HashMap<>();
-    // had to make this hash map to link seats button to the concurrent booking test result
+public class MovieBookingAppGUI extends Application {
+    private static int numberOfInstances;
+    List<Map<String, Button>> seatButtonMaps = new ArrayList<>();
 
     @Override
     public void start(Stage primaryStage) {
-        this.BS = new BookingSys(this.rows, this.cols);
-        GridPane gridPane = getGridPane(); // seats grid...
+        primaryStage.setTitle("Concurrent Booking Configuration");
 
-        Scene scene = new Scene(gridPane, 800, 600); // scene here is the main window of the app
-        primaryStage.setTitle("Movie Ticket Booking System");
-        primaryStage.setScene(scene);
+        Label instructionLabel = new Label("Enter # of concurrent booking windows:");
+        TextField instanceTextField = new TextField();
+        Button submitButton = new Button("Test Concurrent Booking Sim");
+
+        VBox vbox = new VBox(10);
+        vbox.setAlignment(Pos.CENTER);
+        vbox.setPadding(new Insets(20));
+        vbox.getChildren().addAll(instructionLabel, instanceTextField, submitButton);
+
+        Scene configScene = new Scene(vbox, 300, 200);
+        primaryStage.setScene(configScene);
         primaryStage.show();
 
-        testConcurrentBookings(); // just for testing the concurrent booking...
+        submitButton.setOnAction(event -> {
+            try {
+                numberOfInstances = Integer.parseInt(instanceTextField.getText());
+
+                if (numberOfInstances <= 0) {
+                    Show_Alert("Error", "Positive numbers onlyyy!!");
+                    return;
+                }
+
+                primaryStage.close();
+                Launch_Multiple_Instances();
+            } catch (NumberFormatException e) {
+                Show_Alert("Error", "Enter a valid number!");
+            }
+        });
     }
 
-    private GridPane getGridPane() {
-        GridPane gridPane = new GridPane();
+    private void Launch_Multiple_Instances() {
+        List<Stage> stages = new ArrayList<>();
+        BookingSys bookingSys = new BookingSys(5, 5);
 
-        gridPane.setHgap(10); // Horizontal spacing between buttons
-        gridPane.setVgap(10); // Vertical spacing between buttons
-        gridPane.setPadding(new javafx.geometry.Insets(300, 10, 10, 100));
+        for (int i = 0; i < numberOfInstances; i++) {
+            Stage stage = new Stage();
 
-        // setting buttons on seats grid
-        for (int row = 0; row < this.rows; row++) {
-            for (int col = 0; col < this.cols; col++) {
+
+            Map<String, Button> seatButtonMap = new HashMap<>();
+            GridPane gridPanel = Get_Grid_Panel(bookingSys, seatButtonMap);
+
+            Scene scene = new Scene(gridPanel, 800, 600);
+            stage.setTitle("Movie Ticket Booking System | Booking " + (i + 1));
+            stage.setScene(scene);
+            stage.show();
+
+            stages.add(stage);
+            seatButtonMaps.add(seatButtonMap);
+        }
+
+        Test_Concurrent_Bookings(stages, bookingSys, seatButtonMaps);
+    }
+
+    private GridPane Get_Grid_Panel(BookingSys bookingSys, Map<String, Button> seatButtonMap) {
+        GridPane gridPanel = new GridPane();
+
+        gridPanel.setHgap(10);
+        gridPanel.setVgap(10);
+        gridPanel.setPadding(new javafx.geometry.Insets(300, 10, 10, 100));
+
+        for (int row = 0; row < 5; row++) {
+            for (int col = 0; col < 5; col++) {
                 Button seatButton = new Button("Seat " + (row + 1) + "," + (col + 1));
                 seatButton.setStyle(
                         "-fx-background-color: lightgreen; " +
-                        "-fx-border-color: darkgreen; " +
-                        "-fx-border-width: 3px; " +
-                        "-fx-border-radius: 5px; " +
-                        "-fx-background-radius: 5px; " +
-                        "-fx-font-weight: bold;" +
-                        "-fx-min-width: 110px;"
+                                "-fx-border-color: darkgreen; " +
+                                "-fx-border-width: 3px; " +
+                                "-fx-border-radius: 5px; " +
+                                "-fx-background-radius: 5px; " +
+                                "-fx-font-weight: bold;" +
+                                "-fx-min-width: 110px;"
                 );
 
                 final int r = row;
                 final int c = col;
 
-                seatButton.setOnAction(event -> handleSeatBooking(seatButton, r, c));
+                seatButton.setOnAction(event -> Handle_Seat_Booking(r, c, bookingSys));
                 seatButtonMap.put(r + "," + c, seatButton);
-                gridPane.add(seatButton, col, row); // now after button is ready we add it to le grid
+                gridPanel.add(seatButton, col, row);
             }
         }
-        return gridPane;
+        return gridPanel;
     }
 
-    private void showAlert(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
-    }
-
-    private void changeSeatColor(Button seatButton, boolean success){ // updating seats color/info if booking succeeded...
+    private void Show_Alert(String title, String message) {
         Platform.runLater(() -> {
-            if (success) {
-                seatButton.setText("Booked");
-                seatButton.setStyle(
-                        "-fx-background-color: red; " +
-                        "-fx-border-color: darkred; " +
-                        "-fx-border-width: 3px; " +
-                        "-fx-border-radius: 5px; " +
-                        "-fx-background-radius: 5px; " +
-                        "-fx-font-weight: bold;" +
-                        "-fx-min-width: 110px;"
-                );
-                showAlert("Success", "Seat booked successfully!");
-            } else {
-                showAlert("Error", "Seat already booked.");
-            }
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
         });
     }
 
-    private void handleSeatBooking(Button seatButton, int row, int col) {
-        Thread bookingThread = new Thread(() -> { // separate new thread to handle the booking
-            boolean success = BS.bookSeat(row, col);
-            changeSeatColor(seatButton, success);
+    private void Change_Seat_Color(Button seatButton) {
+        Platform.runLater(() -> {
+            seatButton.setText("Booked");
+            seatButton.setStyle(
+                    "-fx-background-color: red; " +
+                            "-fx-border-color: darkred; " +
+                            "-fx-border-width: 3px; " +
+                            "-fx-border-radius: 5px; " +
+                            "-fx-background-radius: 5px; " +
+                            "-fx-font-weight: bold;" +
+                            "-fx-min-width: 110px;"
+            );
+            Show_Alert("Success", "Seat booked successfully!");
+        });
+    }
+
+    private void Handle_Seat_Booking(int row, int col, BookingSys bookingSys) {
+        Thread bookingThread = new Thread(() -> {
+            boolean success = bookingSys.bookSeat(row, col);
+
+            if (success) {
+                Update_All_Instances(row, col);
+            } else {
+                Platform.runLater(() -> Show_Alert("Error", "Seat already booked."));
+            }
         });
 
         bookingThread.start();
     }
 
-    private void testConcurrentBookings() { // representing users bookings as runnable tasks
-
-        int row = 2, col = 2;
-        Runnable user1Task = () -> {
-            boolean success = BS.bookSeat(row, col);
-            updateGUIWithResult("User1", row, col, success);
-        };
-
-        Runnable user2Task = () -> {
-            boolean success = BS.bookSeat(row, col); // now both users are trying to book the same seat concurrentlyyy
-            updateGUIWithResult("User2", row, col, success);
-        };
-
-        Thread user1Thread = new Thread(user1Task);
-        Thread user2Thread = new Thread(user2Task);
-
-        user1Thread.start();
-        user2Thread.start();
-    }
-
-    private void updateGUIWithResult(String user, int row, int col, boolean success) {
+    private void Update_All_Instances(int row, int col) {
         Platform.runLater(() -> {
-            String seatKey = row + "," + col;
-            Button seatButton = seatButtonMap.get(seatKey);
-
-            if (seatButton != null) {
-                changeSeatColor(seatButton, success);
-                String result = success
-                        ? user + " successfully booked Seat (" + (row + 1) + ", " + (col + 1) + ")"
-                        : user + " failed to book Seat (" + (row + 1) + ", " + (col + 1) + ")";
-                System.out.println(result);
+            for (Map<String, Button> seatButtonMap : seatButtonMaps) {
+                Button seatButton = seatButtonMap.get(row + "," + col);
+                if (seatButton != null) {
+                    Change_Seat_Color(seatButton);
+                }
             }
         });
     }
+
+    private void Test_Concurrent_Bookings(List<Stage> stages, BookingSys bookingSys, List<Map<String, Button>> seatButtonMaps) {
+        int row = 2, col = 2;
+
+        for (int i = 0; i < stages.size(); i++) {
+            final int index = i;
+            Runnable userTask = () -> {
+                Map<String, Button> seatButtonMap = seatButtonMaps.get(index);
+
+                boolean success = bookingSys.bookSeat(row, col);
+
+                Platform.runLater(() -> {
+                    Button seatButton = seatButtonMap.get(row + "," + col);
+                    if (seatButton != null) {
+                        Update_All_Instances(row, col);
+                        String result = success
+                                ? "User " + (index+1) + " successfully booked Seat (" + (row+1) + ", " + (col+1) + ")"
+                                : "User " + (index+1) + " failed to book Seat (" + (row+1) + ", " + (col+1) + ")";
+                        System.out.println(result);
+                    }
+                });
+            };
+
+            new Thread(userTask).start();
+        }
+    }
 }
-
-
-//    private void logBookingResult(String user, int row, int col, boolean success) {
-//        Platform.runLater(() -> {
-//            String result = success
-//                    ? user + " successfully booked Seat (" + (row + 1) + ", " + (col + 1) + ")"
-//                    : user + " failed to book Seat (" + (row + 1) + ", " + (col + 1) + ")";
-//            System.out.println(result);
-//        });
-//    }
